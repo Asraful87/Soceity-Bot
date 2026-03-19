@@ -10,6 +10,8 @@ app.use(express.json());
 
 // Webhook endpoint for GoHighLevel events (e.g. contact created, subscription renewed)
 app.post('/webhook/ghl', async (req, res) => {
+  console.log('Webhook received:', req.body);
+
   const secret = req.headers['x-webhook-secret'];
   if (process.env.WEBHOOK_SECRET && secret !== process.env.WEBHOOK_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
