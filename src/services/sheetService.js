@@ -74,6 +74,51 @@ function validateApplication(app) {
   return REQUIRED_FIELDS.filter((f) => !app[f]);
 }
 
+// ── Verification logging ──────────────────────────────────────────────────────
+const VERIFICATIONS_SHEET_NAME = process.env.VERIFICATIONS_SHEET_NAME || 'Verifications';
+const VERIFICATIONS_RANGE = `${VERIFICATIONS_SHEET_NAME}!A:E`;
+
+/**
+ * Appends a verification row to the Verifications sheet.
+ *
+ * @param {{
+ *   discordId: string,
+ *   discordTag: string,
+ *   email: string,
+ *   ghlContactId?: string,
+ *   verifiedAt: string,
+ * }} data
+ */
+async function appendVerificationRow(data) {
+  if (!process.env.GOOGLE_SHEET_ID) return;
+
+  const discordId = String(data?.discordId || '').trim();
+  const discordTag = String(data?.discordTag || '').trim();
+  const email = String(data?.email || '').toLowerCase().trim();
+  const ghlContactId = data?.ghlContactId ? String(data.ghlContactId).trim() : '';
+  const verifiedAt = String(data?.verifiedAt || '').trim();
+
+  if (!discordId || !discordTag || !email || !verifiedAt) {
+    console.warn('[SheetService] appendVerificationRow: missing required verification fields.');
+    return;
+  }
+
+  try {
+    const sheets = await getSheetsClient();
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: VERIFICATIONS_RANGE,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: {
+        values: [[discordId, discordTag, email, ghlContactId, verifiedAt]],
+      },
+    });
+  } catch (err) {
+    console.error('[SheetService] appendVerificationRow failed:', err.message);
+  }
+}
+
 /**
  * Appends one row to the Google Sheet for a new application submission.
  *
@@ -259,4 +304,5 @@ module.exports = {
   findSheetDuplicateSubmission,
   updateSheetApplicationStatus,
   setSheetInterviewData,
+  appendVerificationRow,
 };

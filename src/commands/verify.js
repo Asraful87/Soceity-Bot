@@ -60,11 +60,11 @@ module.exports = {
       // Save to database
       await upsertMember({
         discordId,
-        discordTag: interaction.user.tag,
         email,
+        discordTag: interaction.user.tag,
         ghlContactId: contact.id,
         verified: 1,
-        membershipExpiry: contact.membershipExpiry || null,
+        renewalDate: contact.membershipExpiry || null,
       });
 
       // Log to Google Sheet

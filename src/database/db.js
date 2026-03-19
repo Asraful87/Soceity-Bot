@@ -38,6 +38,8 @@ function initDatabase() {
         CREATE TABLE IF NOT EXISTS members (
           discord_id   TEXT PRIMARY KEY,
           email        TEXT NOT NULL,
+          discord_tag  TEXT,
+          ghl_contact_id TEXT,
           verified     INTEGER NOT NULL DEFAULT 0,
           join_date    TEXT NOT NULL DEFAULT (datetime('now')),
           renewal_date TEXT
@@ -45,6 +47,10 @@ function initDatabase() {
       `);
 
       db.run(`CREATE INDEX IF NOT EXISTS idx_members_email ON members(email)`);
+
+      // Migrations (members): add columns if upgrading from older DB
+      db.run(`ALTER TABLE members ADD COLUMN discord_tag TEXT`, () => { /* ignore if already exists */ });
+      db.run(`ALTER TABLE members ADD COLUMN ghl_contact_id TEXT`, () => { /* ignore if already exists */ });
 
       db.run(`
         CREATE TABLE IF NOT EXISTS verifications (
@@ -106,16 +112,26 @@ function initDatabase() {
 }
 
 // ── Members ───────────────────────────────────────────────────────────────────
-function upsertMember({ discordId, email, verified, joinDate, renewalDate }) {
+function upsertMember({ discordId, email, verified, joinDate, renewalDate, discordTag = null, ghlContactId = null }) {
   return new Promise((resolve, reject) => {
     getDb().run(
-      `INSERT INTO members (discord_id, email, verified, join_date, renewal_date)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO members (discord_id, email, discord_tag, ghl_contact_id, verified, join_date, renewal_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(discord_id) DO UPDATE SET
          email        = excluded.email,
+         discord_tag  = excluded.discord_tag,
+         ghl_contact_id = excluded.ghl_contact_id,
          verified     = excluded.verified,
          renewal_date = excluded.renewal_date`,
-      [discordId, email, verified ? 1 : 0, joinDate ?? new Date().toISOString(), renewalDate ?? null],
+      [
+        discordId,
+        email,
+        discordTag,
+        ghlContactId,
+        verified ? 1 : 0,
+        joinDate ?? new Date().toISOString(),
+        renewalDate ?? null,
+      ],
       function (err) {
         if (err) return reject(err);
         resolve(this.changes);
@@ -127,7 +143,14 @@ function upsertMember({ discordId, email, verified, joinDate, renewalDate }) {
 function getMemberByDiscordId(discordId) {
   return new Promise((resolve, reject) => {
     getDb().get(
-      `SELECT discord_id as discordId, email, verified, join_date as joinDate, renewal_date as renewalDate
+      `SELECT
+         discord_id as discordId,
+         email,
+         discord_tag as discordTag,
+         ghl_contact_id as ghlContactId,
+         verified,
+         join_date as joinDate,
+         renewal_date as renewalDate
        FROM members WHERE discord_id = ?`,
       [discordId],
       (err, row) => {
@@ -141,7 +164,14 @@ function getMemberByDiscordId(discordId) {
 function getMemberByEmail(email) {
   return new Promise((resolve, reject) => {
     getDb().get(
-      `SELECT discord_id as discordId, email, verified, join_date as joinDate, renewal_date as renewalDate
+      `SELECT
+         discord_id as discordId,
+         email,
+         discord_tag as discordTag,
+         ghl_contact_id as ghlContactId,
+         verified,
+         join_date as joinDate,
+         renewal_date as renewalDate
        FROM members WHERE email = ?`,
       [email?.toLowerCase().trim()],
       (err, row) => {
@@ -155,7 +185,14 @@ function getMemberByEmail(email) {
 function getAllVerifiedMembers() {
   return new Promise((resolve, reject) => {
     getDb().all(
-      `SELECT discord_id as discordId, email, verified, join_date as joinDate, renewal_date as renewalDate
+      `SELECT
+         discord_id as discordId,
+         email,
+         discord_tag as discordTag,
+         ghl_contact_id as ghlContactId,
+         verified,
+         join_date as joinDate,
+         renewal_date as renewalDate
        FROM members WHERE verified = 1`,
       [],
       (err, rows) => {
